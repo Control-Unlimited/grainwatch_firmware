@@ -1,0 +1,15 @@
+idf_component_register(SRCS "main.cpp"
+                            "drivers/ProvManager.cpp"
+                            "drivers/NVS.cpp"
+                            "drivers/WifiManager.cpp"
+                            "drivers/GPIO.cpp"
+                            "drivers/SensorManager.cpp"
+                            "drivers/StatusDisplay.cpp"
+                            "drivers/MqttManager.cpp"
+                            "subsys/WorkTask.cpp"
+                        INCLUDE_DIRS "." "includes"
+                        REQUIRES nvs_flash esp_wifi esp_http_server esp_driver_gpio esp_timer driver esp_driver_i2c mqtt json esp_adc
+                        EMBED_FILES "web/index.html" 
+                                    "web/save.html" 
+                                    "web/style.css"
+                                    "config/certfile.json")
