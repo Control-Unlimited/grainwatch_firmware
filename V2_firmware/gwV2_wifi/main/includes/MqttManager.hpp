@@ -13,14 +13,14 @@
 #include "../config/Config.hpp"
 
 struct MqttFileData {
-    std::string rootCA;
-    std::string deviceCert;
-    std::string deviceKey;
+    std::string rootCA;      // CA that signs the broker's certificate (Amazon Root CA 1 for mqtt.doover.com)
     std::string endpoint;
-    std::string clientID;
+    std::string clientID;    // MQTT client ID (the Doover agent ID)
+    std::string username;    // MQTT username (the Doover agent ID)
+    std::string password;    // MQTT password (the device's Doover API token)
     std::string publishTopic;
     std::string subscribeTopic;
-    std::string deviceID;
+    std::string deviceName;  // Display name sent as d_id in each packet
     int port;
 };
 

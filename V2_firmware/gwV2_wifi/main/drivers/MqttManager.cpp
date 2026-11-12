@@ -195,13 +195,13 @@ struct MqttFileData MqttManager::parse_mqtt_json(const std::string jsonString) {
     };
 
     get_string("ROOT_CA", newCreds.rootCA);
-    get_string("DEVICE_CERTIFICATE", newCreds.deviceCert);
-    get_string("DEVICE_PRIVATE_KEY", newCreds.deviceKey);
     get_string("BROKER_ENDPOINT", newCreds.endpoint);
     get_string("CLIENT_ID", newCreds.clientID);
+    get_string("USERNAME", newCreds.username);
+    get_string("PASSWORD", newCreds.password);
     get_string("MQTT_TOPIC_TO_PUBLISH_TO", newCreds.publishTopic);
     get_string("MQTT_TOPIC_TO_SUBSCRIBE_TO", newCreds.subscribeTopic);
-    get_string("DEVICE_ID", newCreds.deviceID);
+    get_string("DEVICE_NAME", newCreds.deviceName);
     
     cJSON* portItem = cJSON_GetObjectItem(root, "BROKER_PORT");
     if (cJSON_IsNumber(portItem)) {
@@ -237,22 +237,34 @@ MqttManager::MqttManager() {
         cert_size -= 3;
     }
 
-    const std::string fileContent((char*)cert_json_start, cert_size);
+    // From data_ptr, not cert_json_start: cert_size has already been reduced by the BOM, so
+    // starting at the BOM would cut the last 3 bytes off the JSON and fail the parse.
+    const std::string fileContent((const char*)data_ptr, cert_size);
 
     // Parse contents
     fileData = parse_mqtt_json(fileContent);
 
     ESP_LOGI(TAG, "Endpoint: %s", fileData.endpoint.c_str());
     ESP_LOGI(TAG, "Port: %d", fileData.port);
+    ESP_LOGI(TAG, "Client ID: %s", fileData.clientID.c_str());
+    ESP_LOGI(TAG, "Username: %s", fileData.username.c_str());
+
+    // The connect will be refused without these, but carrying on lets that failure follow the
+    // normal path: the reading is stored and the failure is counted for the next uplink.
+    if (fileData.clientID.empty() || fileData.username.empty() || fileData.password.empty()) {
+        ESP_LOGE(TAG, "certfile.json has no CLIENT_ID, USERNAME or PASSWORD. The broker will refuse the connection.");
+    }
 
     // Initialize MQTT
     snprintf(uri, sizeof(uri), "mqtts://%s:%d", fileData.endpoint.c_str(), fileData.port);
 
+    // Doover broker: TLS verifies the broker only, and the device logs in with a username and
+    // password (its agent ID and API token). No client certificate.
     mqttCfg.broker.address.uri = uri;
     mqttCfg.broker.verification.certificate = fileData.rootCA.c_str();
     mqttCfg.credentials.client_id = fileData.clientID.c_str();
-    mqttCfg.credentials.authentication.certificate = fileData.deviceCert.c_str();
-    mqttCfg.credentials.authentication.key = fileData.deviceKey.c_str();
+    mqttCfg.credentials.username = fileData.username.c_str();
+    mqttCfg.credentials.authentication.password = fileData.password.c_str();
 
     mqttCfg.session.protocol_ver = MQTT_PROTOCOL_V_3_1_1;
 
@@ -301,7 +313,7 @@ void MqttManager::publish_data(const std::string message) {
 std::string MqttManager::construct_mqtt_packet(const std::vector<struct SensorItem> data) {
     // Root obj
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "d_id", fileData.deviceID.c_str());
+    cJSON_AddStringToObject(root, "d_id", fileData.deviceName.c_str());
 
     // Status obj
     cJSON *status = cJSON_CreateObject();
